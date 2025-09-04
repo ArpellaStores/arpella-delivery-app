@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Text, View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import { useRouter, useSearchParams } from 'expo-router';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { toast } from 'react-native-toast-notifications';
 import axios from 'axios';
+import { useSelector } from 'react-redux';
+import { baseUrl } from '../constants/const';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc';
+const BASE_URL = baseUrl;
 
 const MapScreen = () => {
   const router = useRouter();
+  const params = useSearchParams();
+
   const [currentLocation, setCurrentLocation] = useState(null);
   const [destination, setDestination] = useState({
     latitude: -1.2921,
@@ -18,8 +24,43 @@ const MapScreen = () => {
   const [distance, setDistance] = useState(null);
   const [duration, setDuration] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [order, setOrder] = useState(null);
 
-  const GOOGLE_MAPS_API_KEY = 'AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc'; 
+  // auth (if you need driver details)
+  const auth = useSelector((state) => state.auth || {});
+  const driverPhone =
+    auth?.user?.phone ||
+    auth?.user?.phoneNumber ||
+    auth?.phoneNumber ||
+    auth?.phone ||
+    auth?.user?.msisdn ||
+    null;
+
+  useEffect(() => {
+    // read params passed from DashboardScreen
+    if (params?.destination) {
+      try {
+        const dest = JSON.parse(params.destination);
+        if (dest?.latitude && dest?.longitude) {
+          setDestination(dest);
+        }
+      } catch (e) {
+        console.warn('Invalid destination param', e);
+      }
+    }
+
+    if (params?.order) {
+      try {
+        const ord = JSON.parse(params.order);
+        setOrder(ord);
+      } catch (e) {
+        console.warn('Invalid order param', e);
+      }
+    }
+
+    // optionally parse driver param if passed
+    // if (params?.driver) { ... }
+  }, [params]);
 
   useEffect(() => {
     const getLocation = async () => {
@@ -35,24 +76,31 @@ const MapScreen = () => {
   }, []);
 
   const fetchRoute = async () => {
-    if (currentLocation) {
-      const origin = `${currentLocation.latitude},${currentLocation.longitude}`;
-      const dest = `${destination.latitude},${destination.longitude}`;
+    if (!currentLocation) return;
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.warn('Google Maps API key missing.');
+      return;
+    }
 
-      try {
-        const response = await axios.get(
-          `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${dest}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`
-        );
+    const origin = `${currentLocation.latitude},${currentLocation.longitude}`;
+    const dest = `${destination.latitude},${destination.longitude}`;
 
-        if (response.data.routes.length > 0) {
-          const routeData = response.data.routes[0].legs[0];
-          setRoute(routeData.steps);
-          setDistance(routeData.distance.text);
-          setDuration(routeData.duration.text);
-        }
-      } catch (error) {
-        console.error('Error fetching route:', error);
+    try {
+      const response = await axios.get(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${dest}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`
+      );
+
+      if (response.data.routes?.length > 0) {
+        const routeData = response.data.routes[0].legs[0];
+        setRoute(routeData.steps);
+        setDistance(routeData.distance.text);
+        setDuration(routeData.duration.text);
+      } else {
+        console.warn('No route returned from Google Directions API', response.data);
       }
+    } catch (error) {
+      console.error('Error fetching route:', error);
+      Alert.alert('Error', 'Failed to fetch route.');
     }
   };
 
@@ -60,10 +108,12 @@ const MapScreen = () => {
     fetchRoute();
   }, [currentLocation, destination]);
 
-  // Convert distance to meters
+  // Convert distance string to meters and check proximity
   const isCloseToDestination = () => {
     if (distance) {
-      const meters = parseFloat(distance.replace(/[^\d.]/g, '')) * (distance.includes('km') ? 1000 : 1);
+      // e.g., "3.2 km" or "230 m"
+      const numeric = parseFloat(distance.replace(/[^\d.]/g, '')) || 0;
+      const meters = distance.includes('km') ? numeric * 1000 : numeric;
       return meters < 10;
     }
     return false;
@@ -71,9 +121,17 @@ const MapScreen = () => {
 
   const sendOTP = async () => {
     try {
-      await axios.post('https://your-backend.com/send-otp', { customerPhone: '0123456789' });
+      const customerPhone = order?.userId || order?.user?.phone || null;
+      if (!customerPhone) {
+        toast.show('Customer phone not available', { type: 'warning' });
+        return;
+      }
+
+      // example backend call - adjust path/payload to your backend API
+      await axios.post(`${BASE_URL}/send-otp`, { customerPhone, driverPhone });
       toast.show('OTP sent to customer!', { type: 'success' });
     } catch (error) {
+      console.error('Failed to send OTP', error);
       toast.show('Failed to send OTP', { type: 'error' });
     }
   };
@@ -95,13 +153,13 @@ const MapScreen = () => {
             latitudeDelta: 0.012,
             longitudeDelta: 0.012,
           }}
-          showsUserLocation={true}
+          showsUserLocation
         >
           <Marker coordinate={currentLocation} title="Your Location" pinColor="blue" />
           <Marker coordinate={destination} title="Destination" />
           {route && (
             <Polyline
-              coordinates={route.map(step => ({
+              coordinates={route.map((step) => ({
                 latitude: step.end_location.lat,
                 longitude: step.end_location.lng,
               }))}
@@ -117,6 +175,11 @@ const MapScreen = () => {
       <View style={styles.details}>
         <Text style={styles.detailText}>Remaining Distance: {distance}</Text>
         <Text style={styles.detailText}>Estimated Time: {duration}</Text>
+        {order && (
+          <Text style={[styles.detailText, { marginTop: 8 }]}>
+            Order: {order.orderid ?? order.orderId ?? 'N/A'} • Total: {order.total ?? 'N/A'}
+          </Text>
+        )}
       </View>
 
       {isCloseToDestination() && (
