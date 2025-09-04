@@ -97,9 +97,6 @@ const Login = () => {
         >
           <Text style={styles.buttonText}>Login</Text>
         </TouchableOpacity>
-
-        <Text style={styles.orText}>or</Text>
-
       </View>
     </ScrollView>
   );

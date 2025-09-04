@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 14.4.0",
+    "appVersionSource": "remote",
+    "requireCommit": true
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc"
+      }
+    },
+    "production": {
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
