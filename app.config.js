@@ -7,7 +7,7 @@ export default ({ config }) => ({
     version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/images/logo.jpeg",
-    scheme: "arpella",
+    scheme: "arpella deliveries",
     userInterfaceStyle: "automatic",
 
     splash: {
@@ -44,7 +44,7 @@ export default ({ config }) => ({
 
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.mgachanja.arpella",
+      bundleIdentifier: "com.mgachanja.arpella deliveries",
       buildNumber: "2",
       infoPlist: {
         NSAppTransportSecurity: {
