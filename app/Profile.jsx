@@ -10,17 +10,19 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import BottomNav from './components/BottomNav';
+import { logout } from '../redux/slices/authSlice';
 
 const ProfilePage = () => {
   const router = useRouter();
+  const dispatch = useDispatch();
 
-  // <-- CHANGED: return slice reference directly (no `|| {}` which creates a new object each call)
+  // return slice reference directly
   const auth = useSelector((state) => state.auth);
   const user = auth?.user || null;
 
-  // <-- CHANGED: return slice reference directly
+  // orders slice
   const ordersState = useSelector((state) => state.orders);
   const fulfilledOrdersFromAuth = user?.fulfilledOrders || user?.orders?.fulfilled || user?.orders || null;
   const fulfilledOrdersFromOrdersSlice = ordersState?.fulfilledOrders || ordersState?.list || ordersState?.items || null;
@@ -58,7 +60,6 @@ const ProfilePage = () => {
     return [];
   }, [fulfilledOrdersFromAuth, fulfilledOrdersFromOrdersSlice, user]);
 
-  // Helpers
   const renderFieldLabel = (key) => {
     switch (key) {
       case 'firstName': return 'First Name';
@@ -87,6 +88,27 @@ const ProfilePage = () => {
     });
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Confirm Logout',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: () => {
+            // Dispatch logout action and redirect to Login
+            dispatch(logout());
+            // Optional: If you use persisted storage, clear it here.
+            router.replace('/Login');
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   // UI guards
   if (!auth?.isAuthenticated || !profile) {
     return (
@@ -101,7 +123,6 @@ const ProfilePage = () => {
     );
   }
 
-  // <-- CHANGED: memoize fields array so it's stable across renders
   const fieldsToRender = useMemo(() => ([
     { key: 'firstName', value: profile.firstName },
     { key: 'lastName', value: profile.lastName },
@@ -117,6 +138,12 @@ const ProfilePage = () => {
 
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Icon name="arrow-left" size={24} color="#000" />
+      </TouchableOpacity>
+
+      {/* Logout - top-right */}
+      <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+        <Icon name="sign-out" size={18} color="#fff" />
+        <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
 
       {fieldsToRender.map((field) => (
@@ -173,6 +200,23 @@ const styles = StyleSheet.create({
     top: 20,
     left: 16,
     zIndex: 2,
+  },
+  logoutButton: {
+    position: 'absolute',
+    top: 20,
+    right: 16,
+    zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#B00020',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  logoutText: {
+    color: '#fff',
+    marginLeft: 6,
+    fontWeight: '600',
   },
   container: {
     padding: 16,

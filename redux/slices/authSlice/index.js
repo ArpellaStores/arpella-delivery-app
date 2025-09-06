@@ -1,3 +1,4 @@
+// redux/slices/authSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { loginUserApi } from '../../../services/Auth';
 
@@ -8,21 +9,21 @@ export const loginUser = createAsyncThunk(
     try {
       const response = await loginUserApi(credentials);
       console.log('API Response:', response); // Debug log
-      
+
       // Handle different response structures
       const userData = response.data || response;
-      
+
       // Validate that we have the required user data
       if (!userData || !userData.role) {
         throw new Error('Invalid response format from server');
       }
-      
+
       return userData;
     } catch (error) {
       console.error('Login API Error:', error); // Debug log
-      
+
       let errorMessage = 'Login failed. Please check your credentials.';
-      
+
       // Extract error message from different possible structures
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
@@ -35,7 +36,7 @@ export const loginUser = createAsyncThunk(
       } else if (typeof error === 'string') {
         errorMessage = error;
       }
-      
+
       return rejectWithValue(errorMessage);
     }
   }
