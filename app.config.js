@@ -3,11 +3,12 @@ import 'dotenv/config';
 export default ({ config }) => ({
   expo: {
     name: "Arpella deliveries",
-    slug: "Arpella deliveries",
+    slug: "arpella-deliveries",
     version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/images/logo.jpeg",
-    scheme: "arpella deliveries",
+    // scheme must not contain spaces
+    scheme: "arpella-deliveries",
     userInterfaceStyle: "automatic",
 
     splash: {
@@ -21,7 +22,7 @@ export default ({ config }) => ({
     ],
 
     android: {
-      package: "com.mgachanja.arpellaDeliveries",
+      package: "com.mgachanja.arpelladeliveries",
       versionCode: 2,
       hermesEnabled: false,
 
@@ -36,7 +37,6 @@ export default ({ config }) => ({
       ],
       config: {
         googleMaps: {
-          // Fallback to process.env if provided by EAS; hardcoded key is present per request
           apiKey: process.env.GOOGLE_MAPS_API_KEY || "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc"
         }
       }
@@ -44,7 +44,8 @@ export default ({ config }) => ({
 
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.mgachanja.arpella deliveries",
+      // bundleIdentifier must match android package intent (and must not have spaces)
+      bundleIdentifier: "com.mgachanja.arpelladeliveries",
       buildNumber: "2",
       infoPlist: {
         NSAppTransportSecurity: {
