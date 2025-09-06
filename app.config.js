@@ -2,8 +2,8 @@ import 'dotenv/config';
 
 export default ({ config }) => ({
   expo: {
-    name: "Arpella",
-    slug: "Arpella",
+    name: "Arpella deliveries",
+    slug: "Arpella deliveries",
     version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/images/logo.jpeg",
@@ -21,7 +21,7 @@ export default ({ config }) => ({
     ],
 
     android: {
-      package: "com.mgachanja.arpella",
+      package: "com.mgachanja.arpellaDeliveries",
       versionCode: 2,
       hermesEnabled: false,
 
