@@ -16,6 +16,7 @@ import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { baseUrl } from '../constants/const.js';
 import BottomNav from './components/BottomNav/index.js';
+import { set } from 'react-hook-form';
 const BASE_URL = baseUrl;
 
 export default function DashboardScreen() {
@@ -90,7 +91,9 @@ export default function DashboardScreen() {
       Alert.alert('Error', 'Order ID missing.');
       return;
     }
-
+    setLoading(true)
+     await axios.put(`${baseUrl}/deliverytracking/${item.orderId}/status?status=Delivering`);
+    setLoading(false)
     setLoadingOrderId(item.orderId);
     try {
       const resp = await axios.get(`${BASE_URL}/order/${item.orderId}`, {
