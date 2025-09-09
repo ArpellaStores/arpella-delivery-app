@@ -92,7 +92,7 @@ export default function DashboardScreen() {
       return;
     }
     setLoading(true)
-     await axios.put(`${baseUrl}/deliverytracking/${item.orderId}/status?status=Delivering`);
+    await axios.put(`${baseUrl}/deliverytracking/${item.orderId}/status?status=Delivering`);
     setLoading(false)
     setLoadingOrderId(item.orderId);
     try {
