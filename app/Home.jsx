@@ -57,8 +57,11 @@ export default function DashboardScreen() {
         else if (resp.data && typeof resp.data === 'object' && Object.keys(resp.data).length === 0) data = [];
         else if (resp.data && Array.isArray(resp.data)) data = resp.data;
 
+        // Filter out delivered items
+        const filteredData = data.filter(item => item.status !== 'Delivered');
+
         // Add unique identifiers to prevent duplicate keys
-        const processedData = data.map((item, index) => ({
+        const processedData = filteredData.map((item, index) => ({
           ...item,
           uniqueId: `${item.orderId || 'unknown'}_${index}_${Date.now()}`,
         }));

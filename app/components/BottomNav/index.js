@@ -15,14 +15,6 @@ export default function BottomNav({ active = 'dashboard' }) {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.navItem, active === 'route' && styles.activeNavItem]}
-        onPress={() => router.push('./route')}
-      >
-        <Icon name="map" size={24} color="#4B2C20" />
-        <Text style={[styles.navText, active === 'route' && styles.activeNavText]}>Routes</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
         style={[styles.navItem, active === 'profile' && styles.activeNavItem]}
         onPress={() => router.push('./Profile')}
       >
