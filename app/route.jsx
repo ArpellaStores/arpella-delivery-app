@@ -205,55 +205,14 @@ const MapScreen = () => {
     }
   }, [distance]);
 
-  const sendOTP = async () => {
-    await axios.put(`${baseUrl}/deliverytracking/${order.orderId}/status?status=Delivered`);
-    
-    // try {
-    //   // Try multiple possible customer phone fields
-    //   const customerPhone = 
-    //     order?.phoneNumber || 
-    //     order?.phone || 
-    //     order?.customerPhone ||
-    //     order?.userId || 
-    //     order?.user?.phone || 
-    //     order?.user?.phoneNumber ||
-    //     null;
-
-    //   if (!customerPhone) {
-    //     Alert.alert('Error', 'Customer phone number not available');
-    //     return;
-    //   }
-
-    //   const payload = { 
-    //     customerPhone, 
-    //     driverPhone: driverPhone || driver?.phone,
-    //     orderId: order?.orderId || order?.orderid
-    //   };
-
-    //   console.log('Sending OTP with payload:', payload);
-
-    //   await axios.post(`${BASE_URL}/send-otp`, payload, {
-    //     timeout: 10000,
-    //     headers: { 'Content-Type': 'application/json' }
-    //   });
-      
-    //   toast.show('OTP sent to customer!', { type: 'success' });
-      
-    //   // Optionally navigate back or to completion screen
-    //   // router.push('/delivery-complete');
-      
-    // } catch (error) {
-    //   console.error('Failed to send OTP:', error);
-    //   if (error.response) {
-    //     const message = error.response.data?.message || `Server error: ${error.response.status}`;
-    //     Alert.alert('OTP Error', message);
-    //   } else if (error.request) {
-    //     Alert.alert('Network Error', 'Please check your internet connection.');
-    //   } else {
-    //     Alert.alert('Error', 'Failed to send OTP to customer.');
-    //   }
-    // }
-  };
+const sendOTP = async () => {
+  try {
+    setRouteLoading(true);
+     await axios.put(`${BASE_URL}/deliverytracking/${order.orderid}/status?status=Delivered`);
+     setrouteLoading(false);
+  } catch (error) {
+  }
+};
 
   const handleRetry = useCallback(() => {
     setErrorMsg(null);
@@ -355,7 +314,8 @@ const MapScreen = () => {
         )}
       </View>
 
-      {isCloseToDestination() && (
+      { isCloseToDestination() &&
+       (
         <TouchableOpacity style={styles.deliveredButton} onPress={sendOTP}>
           <Text style={styles.deliveredButtonText}>Mark as Delivered</Text>
         </TouchableOpacity>
