@@ -314,7 +314,7 @@ const sendOTP = async () => {
         )}
       </View>
 
-      { isCloseToDestination() &&
+      {// isCloseToDestination() &&
        (
         <TouchableOpacity style={styles.deliveredButton} onPress={sendOTP}>
           <Text style={styles.deliveredButtonText}>Mark as Delivered</Text>
