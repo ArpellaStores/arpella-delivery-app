@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Text, View, StyleSheet, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, Dimensions, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -28,6 +28,10 @@ const MapScreen = () => {
   const [order, setOrder] = useState(null);
   const [driver, setDriver] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [otpModalVisible, setOtpModalVisible] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   // auth (if you need driver details)
   const auth = useSelector((state) => state.auth || {});
@@ -205,14 +209,66 @@ const MapScreen = () => {
     }
   }, [distance]);
 
-const sendOTP = async () => {
-  try {
-    setRouteLoading(true);
-     await axios.put(`${BASE_URL}/deliverytracking/${order.orderid}/status?status=Delivered`);
-     setrouteLoading(false);
-  } catch (error) {
-  }
-};
+  const getCustomerPhone = useCallback(() => {
+    if (!order) return null;
+    return (
+      order.userId ||
+      order.phone ||
+      order.phoneNumber ||
+      order.customerPhone ||
+      order.msisdn ||
+      order?.customer?.phone ||
+      order?.user?.phone ||
+      order?.recipientPhone ||
+      null
+    );
+  }, [order]);
+
+  const sendOTP = async () => {
+    try {
+      const customerPhone = getCustomerPhone();
+      if (!customerPhone) {
+        Alert.alert('Missing Phone', 'Customer phone number not found on the order.');
+        return;
+      }
+      setSendingOtp(true);
+      const phoneParam = encodeURIComponent(String(customerPhone));
+      await axios.get(`https://api.arpellastore.com/send-otp?username=${phoneParam}`);
+      setOtpModalVisible(true);
+    } catch (error) {
+      Alert.alert('OTP Error', 'Failed to send OTP. Please try again.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const verifyOtpAndComplete = async () => {
+    try {
+      const customerPhone = getCustomerPhone();
+      if (!customerPhone) {
+        Alert.alert('Missing Phone', 'Customer phone number not found on the order.');
+        return;
+      }
+      if (!otpCode || otpCode.trim().length !== 6) {
+        Alert.alert('Invalid Code', 'Please enter the 6-digit OTP.');
+        return;
+      }
+      setVerifyingOtp(true);
+      const phoneParam = encodeURIComponent(String(customerPhone));
+      const otpParam = encodeURIComponent(String(otpCode.trim()));
+      await axios.post(`https://api.arpellastore.com/verify-otp?username=${phoneParam}&otp=${otpParam}`);
+      if (order?.orderid) {
+        await axios.put(`https://api.arpellastore.com/deliverytracking/${order.orderid}/status?status=Delivered`);
+      }
+      setOtpModalVisible(false);
+      setOtpCode('');
+      Alert.alert('Success', 'Order marked as delivered.');
+    } catch (error) {
+      Alert.alert('Verification Failed', 'OTP verification failed. Please check the code and try again.');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
 
   const handleRetry = useCallback(() => {
     setErrorMsg(null);
@@ -316,10 +372,48 @@ const sendOTP = async () => {
 
       {// isCloseToDestination() &&
        (
-        <TouchableOpacity style={styles.deliveredButton} onPress={sendOTP}>
-          <Text style={styles.deliveredButtonText}>Mark as Delivered</Text>
+        <TouchableOpacity style={styles.deliveredButton} onPress={sendOTP} disabled={sendingOtp}>
+          {sendingOtp ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.deliveredButtonText}>Mark as Delivered</Text>
+          )}
         </TouchableOpacity>
       )}
+
+      <Modal
+        transparent
+        animationType="slide"
+        visible={otpModalVisible}
+        onRequestClose={() => setOtpModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Enter 6-digit OTP</Text>
+            <TextInput
+              style={styles.otpInput}
+              keyboardType="number-pad"
+              maxLength={6}
+              value={otpCode}
+              onChangeText={(t) => setOtpCode(t.replace(/[^0-9]/g, ''))}
+              placeholder="******"
+              placeholderTextColor="#999"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => { setOtpModalVisible(false); setOtpCode(''); }}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.verifyButton} onPress={verifyOtpAndComplete} disabled={verifyingOtp}>
+                {verifyingOtp ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.verifyButtonText}>Verify & Complete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <TouchableOpacity style={styles.reloadButton} onPress={fetchRoute}>
         <Text style={styles.reloadButtonText}>Reload Route</Text>
@@ -400,6 +494,66 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#ccc',
     backgroundColor: '#FFF8E1',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  otpInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 6,
+    padding: 12,
+    fontSize: 20,
+    letterSpacing: 8,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#9E9E9E',
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  verifyButton: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  verifyButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   navItem: {
     alignItems: 'center',
