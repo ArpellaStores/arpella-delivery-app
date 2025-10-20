@@ -146,11 +146,8 @@ const MapScreen = () => {
         if (routeData.legs && routeData.legs.length > 0) {
           const leg = routeData.legs[0];
           
-          // Create route coordinates from the overview_polyline or steps
           let routeCoordinates = [];
           if (routeData.overview_polyline?.points) {
-            // You would need to decode the polyline here
-            // For now, using steps as fallback
             routeCoordinates = leg.steps?.map((step) => ({
               latitude: step.end_location?.lat,
               longitude: step.end_location?.lng,
@@ -370,7 +367,7 @@ const MapScreen = () => {
         )}
       </View>
 
-      {// isCloseToDestination() &&
+      {isCloseToDestination() &&
        (
         <TouchableOpacity style={styles.deliveredButton} onPress={sendOTP} disabled={sendingOtp}>
           {sendingOtp ? (

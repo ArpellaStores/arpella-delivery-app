@@ -1,259 +1,483 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  Image, 
-  StyleSheet, 
-  TouchableOpacity, 
+// app/screens/Login.jsx
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  SafeAreaView,
+  View,
+  Text,
+  TextInput,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { useToast } from 'react-native-toast-notifications';
 import { useRouter } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import logo from '../assets/images/logo.jpeg';
 import { loginUser } from '../redux/slices/authSlice';
 
-const Login = () => {
+const CREDENTIALS_KEY = 'arpella_credentials_v1';
+
+export default function Login() {
   const router = useRouter();
   const toast = useToast();
   const dispatch = useDispatch();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [rememberMe, setRememberMe] = useState(false);
+  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
+  const [manualLoginPressed, setManualLoginPressed] = useState(false);
+
   // Redux state with safe fallbacks
   const authState = useSelector((state) => state.auth) || {};
-  const { isLoading = false, error, user } = authState;
-  
-  const { control, handleSubmit, formState: { errors }, reset } = useForm({
+  const { isLoading = false, error, user, isAuthenticated } = authState;
+
+  const { control, handleSubmit, setValue, formState: { errors } } = useForm({
     defaultValues: {
       phone: '',
       password: '',
     },
   });
 
-  // Check if user role is allowed
-  const isAllowedRole = (role) => {
+  // Allowed roles logic
+  const isAllowedRole = useCallback((role) => {
+    if (!role) return false;
     const allowedRoles = ['Admin', 'admin', 'Delivery', 'delivery', 'delivery guy'];
-    return allowedRoles.some(allowedRole => 
-      allowedRole.toLowerCase() === role.toLowerCase()
-    );
+    return allowedRoles.some(allowedRole => allowedRole.toLowerCase() === role.toLowerCase());
+  }, []);
+
+  // --- SecureStore helpers ---
+  const saveCredentials = async ({ phone, pass, remember }) => {
+    try {
+      const payload = {
+        phone: String(phone || ''),
+        pass: String(pass || ''),
+        remember: !!remember,
+        savedAt: Date.now(),
+      };
+      await SecureStore.setItemAsync(CREDENTIALS_KEY, JSON.stringify(payload));
+      console.info('[Login] SecureStore: credentials saved ->', {
+        phone: payload.phone ? `${payload.phone.slice(0, 6)}****` : null,
+        remember: payload.remember,
+      });
+      return true;
+    } catch (e) {
+      console.error('[Login] SecureStore save failed:', e);
+      return false;
+    }
   };
 
-  const onSubmit = async (data) => {
-    if (isSubmitting) return; // Prevent double submission
-    
-    setIsSubmitting(true);
-    
+  const loadCredentials = async () => {
     try {
-      // Send credentials in the format that matches your web app
+      const txt = await SecureStore.getItemAsync(CREDENTIALS_KEY);
+      if (!txt) {
+        console.info('[Login] SecureStore: no saved credentials');
+        return null;
+      }
+      const parsed = JSON.parse(txt);
+      console.info('[Login] SecureStore: loaded credentials ->', {
+        phone: parsed.phone ? `${parsed.phone.slice(0, 6)}****` : null,
+        remember: parsed.remember,
+        savedAt: parsed.savedAt,
+      });
+      return parsed;
+    } catch (e) {
+      console.error('[Login] SecureStore load failed:', e);
+      return null;
+    }
+  };
+
+  const clearCredentials = async () => {
+    try {
+      await SecureStore.deleteItemAsync(CREDENTIALS_KEY);
+      console.info('[Login] SecureStore: credentials cleared');
+      return true;
+    } catch (e) {
+      console.error('[Login] SecureStore clear failed:', e);
+      return false;
+    }
+  };
+  // --- end SecureStore helpers ---
+
+  // utils
+  const normalizePhone = (raw) => {
+    if (!raw) return '';
+    const digits = String(raw).replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('254')) return digits;
+    if (digits.startsWith('0')) return '254' + digits.replace(/^0+/, '');
+    return '254' + digits;
+  };
+
+  // Get error message helper
+  const getErrorMessage = (error) => {
+    if (!error) return 'Login failed. Please try again.';
+
+    let message = '';
+
+    if (typeof error === 'string') {
+      message = error;
+    } else if (error.message) {
+      message = error.message;
+    } else if (error.data && typeof error.data === 'string') {
+      message = error.data;
+    } else if (error.response?.data?.message) {
+      message = error.response.data.message;
+    } else {
+      message = 'Login failed. Please try again.';
+    }
+
+    if (message.includes('Request failed with status code 400')) {
+      return 'Invalid phone number or password. Please check your credentials.';
+    } else if (message.includes('Request failed with status code 401')) {
+      return 'Invalid phone number or password. Please check your credentials.';
+    } else if (message.includes('Request failed with status code 404')) {
+      return 'Account not found. Please check your phone number.';
+    } else if (message.includes('Request failed with status code 500')) {
+      return 'Server error. Please try again later.';
+    } else if (message.includes('Network Error')) {
+      return 'Network error. Please check your internet connection.';
+    } else if (message.toLowerCase().includes('timeout')) {
+      return 'Connection timeout. Please try again.';
+    }
+
+    return message;
+  };
+
+  // Load saved credentials once on mount (populate form fields)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const creds = await loadCredentials();
+        if (!mounted || !creds) return;
+
+        if (creds.remember && creds.phone) {
+          const normalized = normalizePhone(creds.phone);
+          setValue('phone', normalized);
+          setRememberMe(true);
+        }
+        if (creds.remember && creds.pass) {
+          setValue('password', creds.pass);
+        }
+      } catch (e) {
+        console.error('Error loading credentials on mount:', e);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [setValue]);
+
+  // Auto-login: attempts a single auto-login if credentials exist and rememberMe is true
+  useEffect(() => {
+    let mounted = true;
+    let timer = null;
+
+    const performAutoLogin = async () => {
+      if (!mounted) return;
+      if (autoLoginAttempted || isAuthenticated || manualLoginPressed) {
+        console.info('[Login] Auto-login skipped (already attempted or user authenticated or manual login in progress)');
+        return;
+      }
+
+      setAutoLoginAttempted(true);
+
+      try {
+        const creds = await loadCredentials();
+        if (!creds || !creds.remember || !creds.phone || !creds.pass) {
+          console.info('[Login] No usable saved credentials (remember flag, phone or pass missing)');
+          return;
+        }
+
+        // populate form fields (in case they were not already)
+        const normalized = normalizePhone(creds.phone);
+        setValue('phone', normalized);
+        setValue('password', creds.pass);
+        setRememberMe(true);
+
+        // perform login
+        setIsSubmitting(true);
+        const loginData = {
+          phoneNumber: normalized,
+          passwordHash: creds.pass,
+        };
+
+        const result = await dispatch(loginUser(loginData));
+        if (loginUser.fulfilled.match(result)) {
+          const userData = result.payload;
+          if (userData && userData.role && isAllowedRole(userData.role)) {
+            toast.show(`Welcome back, ${userData.firstName || 'User'}!`, {
+              type: 'success',
+              duration: 3500,
+              placement: 'top',
+              offsetTop: 50,
+            });
+            // redirect
+            router.replace('./Home');
+          } else {
+            toast.show('Access denied. Only Admin and Delivery personnel are allowed.', {
+              type: 'danger',
+              duration: 4000,
+              placement: 'top',
+              offsetTop: 50,
+            });
+            await clearCredentials();
+            setRememberMe(false);
+          }
+        } else {
+          const errorMessage = getErrorMessage(result.payload || result.error);
+          toast.show(errorMessage, { type: 'danger', placement: 'top', offsetTop: 50 });
+          // clear persisted credentials if they are stale / invalid
+          await clearCredentials();
+          setRememberMe(false);
+        }
+      } catch (e) {
+        console.error('Auto-login error:', e);
+        // give a small hint but avoid spamming
+        toast.show('Auto-login encountered an issue. Please login manually.', { type: 'warning', duration: 2000 });
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    // small delay to allow UI to mount and Redux to hydrate if needed
+    timer = setTimeout(performAutoLogin, 200);
+    return () => {
+      if (timer) clearTimeout(timer);
+      mounted = false;
+    };
+  }, [
+    autoLoginAttempted,
+    isAuthenticated,
+    manualLoginPressed,
+    dispatch,
+    router,
+    setValue,
+    toast,
+    isAllowedRole,
+  ]);
+
+  // Navigate on successful authentication (manual path)
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      router.replace('./Home');
+    }
+  }, [isAuthenticated, user, router]);
+
+  // Handle login errors from Redux when user manually tried to login
+  useEffect(() => {
+    if (error && manualLoginPressed) {
+      toast.show(getErrorMessage(error), {
+        type: 'danger',
+        duration: 3000,
+        placement: 'top',
+        offsetTop: 50,
+      });
+    }
+  }, [error, toast, manualLoginPressed]);
+
+  const togglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
+  };
+
+  const isButtonDisabled = isSubmitting || isLoading;
+
+  // Manual submit handler (user pressed Login)
+  const onSubmit = async (data) => {
+    if (isSubmitting) return;
+    setManualLoginPressed(true);
+    setIsSubmitting(true);
+
+    try {
+      const normalizedPhone = normalizePhone(data.phone);
+
       const loginData = {
-        username: data.phone,    // lowercase 'username' - will be converted to userName in API
-        password: data.password, // lowercase 'password' - will be converted to PasswordHash in API
+        phoneNumber: normalizedPhone,
+        passwordHash: data.password,
       };
 
-      console.log('Dispatching login with data:', loginData);
+      console.log('Dispatching login with data:', { phone: normalizedPhone });
+
       const result = await dispatch(loginUser(loginData));
       console.log('Login result:', result);
-      
-      // Check if the action was fulfilled (successful)
+
       if (loginUser.fulfilled.match(result)) {
-        // Access the user data from result.payload
+        // Success
         const userData = result.payload;
         console.log('User data:', userData);
-        
+
         if (userData && userData.role && isAllowedRole(userData.role)) {
-          toast.show(`Welcome back, ${userData.firstName}!`, { 
-            type: 'success', 
+          toast.show(`Welcome back, ${userData.firstName || 'User'}!`, {
+            type: 'success',
             duration: 3500,
-            placement: "top", 
-            offsetTop: 50 
+            placement: 'top',
+            offsetTop: 50,
           });
-          router.push('./Home');
+
+          if (rememberMe) {
+            await saveCredentials({ phone: normalizedPhone, pass: data.password, remember: true });
+          } else {
+            await clearCredentials();
+          }
+
+          router.replace('./Home');
         } else {
-          toast.show('Access denied. Only Admin and Delivery personnel are allowed.', { 
-            type: 'danger', 
+          toast.show('Access denied. Only Admin and Delivery personnel are allowed.', {
+            type: 'danger',
             duration: 4000,
-            placement: "top",
-            offsetTop: 50
+            placement: 'top',
+            offsetTop: 50,
           });
+          // make sure credentials aren't stored for disallowed user
+          await clearCredentials();
+          setRememberMe(false);
         }
       } else {
-        // Login was rejected - error will be handled by Redux slice
-        console.log('Login was rejected:', result.payload);
+        // Rejected
+        console.log('Login was rejected:', result.payload || result.error);
+        const errorMessage = getErrorMessage(result.payload || result.error);
+        toast.show(errorMessage, {
+          type: 'danger',
+          duration: 3000,
+          placement: 'top',
+          offsetTop: 50,
+        });
       }
     } catch (err) {
       console.log('Catch block error:', err);
-      const errorMessage = typeof err === 'string' ? err : 'Login failed. Please check your credentials.';
-      toast.show(errorMessage, { 
-        type: 'danger', 
-        duration: 3000,
-        placement: "top",
-        offsetTop: 50
-      });
+      const errorMessage = getErrorMessage(err);
+      toast.show(errorMessage, { type: 'danger', duration: 3000, placement: 'top', offsetTop: 50 });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Clear form on component mount
-  useEffect(() => {
-    reset();
-  }, [reset]);
-
-  // Handle login errors from Redux
-  useEffect(() => {
-    if (error) {
-      toast.show(error, { 
-        type: 'danger', 
-        duration: 3000,
-        placement: "top",
-        offsetTop: 50
-      });
-    }
-  }, [error, toast]);
-
-  const togglePasswordVisibility = () => {
-    setShowPassword(prev => !prev);
-  };
-
-  const isButtonDisabled = isSubmitting || isLoading;
-
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.header}>Welcome Back to</Text>
-        <Text style={styles.brandName}>Arpella</Text>
-      </View>
-      
-      <View style={styles.logoContainer}>
-        <View style={styles.logoWrapper}>
-          <Image source={logo} style={styles.logo} />
-        </View>
-      </View>
-
-      <View style={styles.formContainer}>
-        <Text style={styles.formTitle}>Login to Your Account</Text>
-        <Text style={styles.formSubtitle}>Enter your credentials to continue</Text>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Phone Number</Text>
-          <Controller
-            control={control}
-            name="phone"
-            rules={{
-              required: 'Phone number is required',
-              pattern: {
-                value: /^254[0-9]{9}$/,
-                message: 'Phone number must start with 254 and have 9 digits after',
-              },
-            }}
-            render={({ field: { onChange, onBlur, value } }) => (
-              <View style={styles.inputContainer}>
-                <Ionicons 
-                  name="call-outline" 
-                  size={20} 
-                  color="#8B7355" 
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="254XXXXXXXXX"
-                  keyboardType="numeric"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  placeholderTextColor="#A0A0A0"
-                  editable={!isButtonDisabled}
-                />
-              </View>
-            )}
-          />
-          {errors.phone && <Text style={styles.errorText}>{errors.phone.message}</Text>}
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.headerContainer}>
+          <Text style={styles.header}>Welcome Back to</Text>
+          <Text style={styles.brandName}>Arpella</Text>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Password</Text>
-          <Controller
-            control={control}
-            name="password"
-            rules={{ 
-              required: 'Password is required',
-              minLength: {
-                value: 6,
-                message: 'Password must be at least 6 characters'
-              }
-            }}
-            render={({ field: { onChange, onBlur, value } }) => (
-              <View style={styles.inputContainer}>
-                <Ionicons 
-                  name="lock-closed-outline" 
-                  size={20} 
-                  color="#8B7355" 
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter password"
-                  secureTextEntry={!showPassword}
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  placeholderTextColor="#A0A0A0"
-                  editable={!isButtonDisabled}
-                />
-                <TouchableOpacity 
-                  onPress={togglePasswordVisibility}
-                  style={styles.eyeIcon}
-                  disabled={isButtonDisabled}
-                >
-                  <Ionicons 
-                    name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                    size={20} 
-                    color="#8B7355" 
+        <View style={styles.logoContainer}>
+          <View style={styles.logoWrapper}>
+            <Image source={logo} style={styles.logo} />
+          </View>
+        </View>
+
+        <View style={styles.formContainer}>
+          <Text style={styles.formTitle}>Login to Your Account</Text>
+          <Text style={styles.formSubtitle}>Enter your credentials to continue</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Phone Number</Text>
+            <Controller
+              control={control}
+              name="phone"
+              rules={{
+                required: 'Phone number is required',
+                pattern: {
+                  value: /^254[0-9]{9}$/,
+                  message: 'Phone number must start with 254 and have 9 digits after',
+                },
+              }}
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View style={styles.inputContainer}>
+                  <Ionicons name="call-outline" size={20} color="#8B7355" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="254XXXXXXXXX"
+                    keyboardType="numeric"
+                    onBlur={onBlur}
+                    onChangeText={(txt) => onChange(normalizePhone(txt))}
+                    value={value}
+                    placeholderTextColor="#A0A0A0"
+                    editable={!isButtonDisabled}
                   />
-                </TouchableOpacity>
+                </View>
+              )}
+            />
+            {errors.phone && <Text style={styles.errorText}>{errors.phone.message}</Text>}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <Controller
+              control={control}
+              name="password"
+              rules={{
+                required: 'Password is required',
+                minLength: { value: 6, message: 'Password must be at least 6 characters' },
+              }}
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View style={styles.inputContainer}>
+                  <Ionicons name="lock-closed-outline" size={20} color="#8B7355" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter password"
+                    secureTextEntry={!showPassword}
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    placeholderTextColor="#A0A0A0"
+                    editable={!isButtonDisabled}
+                  />
+                  <TouchableOpacity onPress={togglePasswordVisibility} style={styles.eyeIcon} disabled={isButtonDisabled}>
+                    <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#8B7355" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+            {errors.password && <Text style={styles.errorText}>{errors.password.message}</Text>}
+          </View>
+
+          <TouchableOpacity style={styles.rememberMeContainer} onPress={() => setRememberMe((v) => !v)} disabled={isButtonDisabled}>
+            <Ionicons name={rememberMe ? 'checkbox' : 'square-outline'} size={24} color={isButtonDisabled ? '#ccc' : '#4B2C20'} />
+            <Text style={[styles.rememberMeText, isButtonDisabled && styles.disabledText]}>Remember Me</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.button, isButtonDisabled && styles.buttonDisabled]} onPress={handleSubmit(onSubmit)} disabled={isButtonDisabled}>
+            {isButtonDisabled ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color="white" size="small" />
+                <Text style={[styles.buttonText, { marginLeft: 10 }]}>{isSubmitting ? 'Signing In...' : 'Loading...'}</Text>
+              </View>
+            ) : (
+              <View style={styles.buttonContent}>
+                <Text style={styles.buttonText}>Login</Text>
+                <Ionicons name="arrow-forward" size={20} color="white" style={styles.buttonIcon} />
               </View>
             )}
-          />
-          {errors.password && <Text style={styles.errorText}>{errors.password.message}</Text>}
+          </TouchableOpacity>
+
+          <View style={styles.roleInfoContainer}>
+            <Ionicons name="information-circle-outline" size={16} color="#8B7355" />
+            <Text style={styles.roleInfoText}>Only Admin and Delivery personnel can access this app</Text>
+          </View>
         </View>
 
-        <TouchableOpacity
-          style={[styles.button, isButtonDisabled && styles.buttonDisabled]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={isButtonDisabled}
-        >
-          {isButtonDisabled ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color="white" size="small" />
-              <Text style={[styles.buttonText, { marginLeft: 10 }]}>
-                {isSubmitting ? 'Signing In...' : 'Loading...'}
-              </Text>
+        {isButtonDisabled && (
+          <View style={styles.backdrop}>
+            <View style={styles.backdropLoadingContainer}>
+              <ActivityIndicator size="large" color="#4B2C20" />
+              <Text style={styles.backdropLoadingText}>Logging you in...</Text>
             </View>
-          ) : (
-            <View style={styles.buttonContent}>
-              <Text style={styles.buttonText}>Login</Text>
-              <Ionicons name="arrow-forward" size={20} color="white" style={styles.buttonIcon} />
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.roleInfoContainer}>
-          <Ionicons name="information-circle-outline" size={16} color="#8B7355" />
-          <Text style={styles.roleInfoText}>
-            Only Admin and Delivery personnel can access this app
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#FFF8E1' },
   container: {
     flexGrow: 1,
     padding: 20,
@@ -262,7 +486,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 20,
     marginBottom: 20,
   },
   header: {
@@ -279,60 +503,61 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
   },
   logoWrapper: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
+    elevation: 6,
     shadowColor: '#4B2C20',
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 90,
+    height: 90,
     resizeMode: 'contain',
   },
   formContainer: {
     backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 24,
-    elevation: 5,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 4,
     shadowColor: '#4B2C20',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-  },
-  formTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#4B2C20',
-    marginBottom: 8,
-  },
-  formSubtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#8B7355',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
     marginBottom: 30,
   },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#4B2C20',
+    marginBottom: 6,
+  },
+  formSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    color: '#8B7355',
+    marginBottom: 18,
+  },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#5D4037',
     marginBottom: 8,
@@ -340,49 +565,63 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#E0E0E0',
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: '#FAFAFA',
-    paddingHorizontal: 15,
-    height: 50,
+    paddingHorizontal: 12,
+    height: 48,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: 10,
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: '#333',
     paddingVertical: 0,
   },
   eyeIcon: {
-    padding: 5,
+    padding: 6,
   },
   errorText: {
     color: '#D32F2F',
     fontSize: 12,
-    marginTop: 5,
-    marginLeft: 5,
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  rememberMeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  rememberMeText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#4B2C20',
+    fontWeight: '500',
+  },
+  disabledText: {
+    color: '#ccc',
   },
   button: {
     backgroundColor: '#4B2C20',
-    paddingVertical: 15,
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 12,
-    marginTop: 10,
-    elevation: 3,
+    borderRadius: 10,
+    marginTop: 6,
+    elevation: 2,
     shadowColor: '#4B2C20',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.14,
     shadowRadius: 4,
   },
   buttonDisabled: {
     backgroundColor: '#8B7355',
-    elevation: 1,
+    elevation: 0,
   },
   buttonContent: {
     flexDirection: 'row',
@@ -396,8 +635,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
   },
   buttonIcon: {
     marginLeft: 8,
@@ -406,16 +645,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 14,
     paddingHorizontal: 10,
   },
   roleInfoText: {
     fontSize: 12,
     color: '#8B7355',
     textAlign: 'center',
-    marginLeft: 5,
+    marginLeft: 6,
     lineHeight: 16,
   },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  backdropLoadingContainer: {
+    backgroundColor: '#FFF',
+    padding: 18,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+  },
+  backdropLoadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#4B2C20',
+  },
 });
-
-export default Login;
