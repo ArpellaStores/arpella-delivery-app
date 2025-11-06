@@ -9,6 +9,7 @@ import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { baseUrl } from '../constants/const';
 import BottomNav from './components/BottomNav';
+
 const GOOGLE_MAPS_API_KEY = 'AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc';
 const BASE_URL = baseUrl;
 
@@ -84,7 +85,7 @@ const MapScreen = () => {
         console.error('Error parsing driver param:', e);
       }
     }
-  }, [params?.destination, params?.order, params?.driver]); // More specific dependencies
+  }, [params?.destination, params?.order, params?.driver]);
 
   useEffect(() => {
     const getLocation = async () => {
@@ -112,7 +113,7 @@ const MapScreen = () => {
       }
     };
     getLocation();
-  }, []); // Only run once on mount
+  }, []);
 
   const fetchRoute = useCallback(async () => {
     if (!currentLocation || routeLoading) {
@@ -181,25 +182,22 @@ const MapScreen = () => {
     } finally {
       setRouteLoading(false);
     }
-  }, [currentLocation, destination.latitude, destination.longitude, routeLoading]); // Memoize with specific dependencies
+  }, [currentLocation, destination.latitude, destination.longitude, routeLoading]);
 
-  // Fetch route when location and destination are available - only once
   useEffect(() => {
     if (currentLocation && destination && !route && !routeLoading) {
       fetchRoute();
     }
-  }, [currentLocation, destination.latitude, destination.longitude]); // Only trigger when coordinates change
+  }, [currentLocation, destination.latitude, destination.longitude]);
 
-  // Convert distance string to meters and check proximity
   const isCloseToDestination = useCallback(() => {
     if (!distance) return false;
     
     try {
-      // e.g., "3.2 km" or "230 m"
       const numericMatch = distance.match(/[\d.]+/);
       const numeric = numericMatch ? parseFloat(numericMatch[0]) : 0;
       const meters = distance.toLowerCase().includes('km') ? numeric * 1000 : numeric;
-      return meters < 50; // Increased threshold to 50 meters
+      return meters < 50;
     } catch (error) {
       console.error('Error parsing distance:', error);
       return false;
@@ -253,13 +251,34 @@ const MapScreen = () => {
       setVerifyingOtp(true);
       const phoneParam = encodeURIComponent(String(customerPhone));
       const otpParam = encodeURIComponent(String(otpCode.trim()));
+      
+      // Verify OTP
       await axios.post(`https://api.arpellastore.com/verify-otp?username=${phoneParam}&otp=${otpParam}`);
+      
+      // Update order status
       if (order?.orderid) {
         await axios.put(`https://api.arpellastore.com/deliverytracking/${order.orderid}/status?status=Delivered`);
       }
+      
+      // Close modal and reset
       setOtpModalVisible(false);
       setOtpCode('');
-      Alert.alert('Success', 'Order marked as delivered.');
+      
+      // Show success message
+      Alert.alert(
+        'Success', 
+        'Order marked as delivered.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate to Home using replace to prevent going back
+              router.replace('/Home');
+            }
+          }
+        ]
+      );
+      
     } catch (error) {
       Alert.alert('Verification Failed', 'OTP verification failed. Please check the code and try again.');
     } finally {
@@ -273,7 +292,6 @@ const MapScreen = () => {
     setRoute(null);
     setDistance(null);
     setDuration(null);
-    // Re-run location effect
     Location.requestForegroundPermissionsAsync().then(({ status }) => {
       if (status === 'granted') {
         Location.getCurrentPositionAsync({
@@ -367,8 +385,7 @@ const MapScreen = () => {
         )}
       </View>
 
-      {isCloseToDestination() &&
-       (
+      {isCloseToDestination() && (
         <TouchableOpacity style={styles.deliveredButton} onPress={sendOTP} disabled={sendingOtp}>
           {sendingOtp ? (
             <ActivityIndicator color="#fff" />
@@ -397,10 +414,20 @@ const MapScreen = () => {
               placeholderTextColor="#999"
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => { setOtpModalVisible(false); setOtpCode(''); }}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => { 
+                  setOtpModalVisible(false); 
+                  setOtpCode(''); 
+                }}
+              >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.verifyButton} onPress={verifyOtpAndComplete} disabled={verifyingOtp}>
+              <TouchableOpacity 
+                style={styles.verifyButton} 
+                onPress={verifyOtpAndComplete} 
+                disabled={verifyingOtp}
+              >
                 {verifyingOtp ? (
                   <ActivityIndicator color="#fff" />
                 ) : (

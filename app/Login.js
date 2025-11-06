@@ -148,7 +148,6 @@ export default function Login() {
     return message;
   };
 
-  // Load saved credentials once on mount (populate form fields)
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -195,13 +194,11 @@ export default function Login() {
           return;
         }
 
-        // populate form fields (in case they were not already)
         const normalized = normalizePhone(creds.phone);
         setValue('phone', normalized);
         setValue('password', creds.pass);
         setRememberMe(true);
 
-        // perform login
         setIsSubmitting(true);
         const loginData = {
           phoneNumber: normalized,
@@ -218,7 +215,6 @@ export default function Login() {
               placement: 'top',
               offsetTop: 50,
             });
-            // redirect
             router.replace('./Home');
           } else {
             toast.show('Access denied. Only Admin and Delivery personnel are allowed.', {
@@ -233,20 +229,17 @@ export default function Login() {
         } else {
           const errorMessage = getErrorMessage(result.payload || result.error);
           toast.show(errorMessage, { type: 'danger', placement: 'top', offsetTop: 50 });
-          // clear persisted credentials if they are stale / invalid
           await clearCredentials();
           setRememberMe(false);
         }
       } catch (e) {
         console.error('Auto-login error:', e);
-        // give a small hint but avoid spamming
         toast.show('Auto-login encountered an issue. Please login manually.', { type: 'warning', duration: 2000 });
       } finally {
         setIsSubmitting(false);
       }
     };
 
-    // small delay to allow UI to mount and Redux to hydrate if needed
     timer = setTimeout(performAutoLogin, 200);
     return () => {
       if (timer) clearTimeout(timer);
