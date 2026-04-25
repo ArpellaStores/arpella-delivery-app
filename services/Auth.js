@@ -6,11 +6,11 @@ import { baseUrl } from '../constants/const'; // adjust path if baseUrl is elsew
  * Simple login API call using axios only
  * credentials = { phoneNumber, passwordHash }
  */
-export const loginUserApi = async ({ phoneNumber, passwordHash }) => {
+export const loginUserApi = async ({ phoneNumber, password }) => {
   try {
     const payload = {
       userName: phoneNumber, // your backend expects userName
-      passwordHash,
+      password,
     };
 
     const response = await axios.post(`${baseUrl}/login`, payload, {

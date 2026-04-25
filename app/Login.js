@@ -202,7 +202,7 @@ export default function Login() {
         setIsSubmitting(true);
         const loginData = {
           phoneNumber: normalized,
-          passwordHash: creds.pass,
+          password: creds.pass,
         };
 
         const result = await dispatch(loginUser(loginData));
@@ -292,7 +292,7 @@ export default function Login() {
 
       const loginData = {
         phoneNumber: normalizedPhone,
-        passwordHash: data.password,
+        password: data.password,
       };
 
       console.log('Dispatching login with data:', { phone: normalizedPhone });
