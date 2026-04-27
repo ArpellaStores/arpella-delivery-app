@@ -29,19 +29,23 @@ const ProfilePage = () => {
   const auth = useSelector((state) => state.auth);
   const user = auth?.user || null;
 
+  // Extract actual user data from potentially nested Redux object
+  const actualUser = user?.user || user;
+
   // Extract user phone/identifier for API calls with null check
-  const userPhone = (typeof user === 'object' && user && (user.phoneNumber || user.userName || user.phone)) || null;
+  const userPhone = (typeof actualUser === 'object' && actualUser && (actualUser.phoneNumber || actualUser.userName || actualUser.phone)) || null;
 
   // Compute displayed user fields with fallbacks
   const profile = useMemo(() => {
-    if (!user) return null;
+    if (!actualUser) return null;
 
-    const firstName = user.firstName || user.FirstName || user.fName || '';
-    const lastName = user.lastName || user.last_name || user.sName || '';
-    const email = user.email || user.Email || user.userEmail || '';
-    const phone = user.phoneNumber || user.phone || user.userName || user.msisdn || '';
-    const role = user.role || user.Role || '';
-    const hasPassword = !!user.password;
+    const firstName = actualUser.firstName || actualUser.FirstName || actualUser.fName || '';
+    const lastName = actualUser.lastName || actualUser.last_name || actualUser.sName || '';
+    const email = actualUser.email || actualUser.Email || actualUser.userEmail || '';
+    const phone = actualUser.phoneNumber || actualUser.phone || actualUser.userName || actualUser.msisdn || '';
+    let role = actualUser.role || actualUser.Role || '';
+    if (Array.isArray(role)) role = role[0];
+    const hasPassword = !!actualUser.password;
 
     return {
       firstName,
@@ -50,9 +54,9 @@ const ProfilePage = () => {
       phone,
       role,
       hasPassword,
-      raw: user,
+      raw: actualUser,
     };
-  }, [user]);
+  }, [actualUser]);
 
   // Fetch delivered orders by the signed-in agent
   useEffect(() => {
@@ -87,7 +91,6 @@ const ProfilePage = () => {
         }));
 
         setDeliveredOrders(processedData);
-        console.log('ProfilePage: delivered orders loaded', processedData.length);
       } catch (error) {
         console.error('Failed to fetch delivered orders:', error);
         // Don't show alert for this non-critical error, just log it
@@ -97,7 +100,7 @@ const ProfilePage = () => {
     };
 
     fetchDeliveredOrders();
-  }, [user, userPhone]);
+  }, [actualUser, userPhone]);
 
   const renderFieldLabel = (key) => {
     switch (key) {
@@ -106,25 +109,8 @@ const ProfilePage = () => {
       case 'email': return 'Email';
       case 'phone': return 'Phone';
       case 'role': return 'Role';
-      case 'password': return 'Password';
       default: return key;
     }
-  };
-
-  const handleEditField = (fieldKey) => {
-    if (!profile) {
-      Alert.alert('Error', 'Profile data not available.');
-      return;
-    }
-
-    const currentValue = profile[fieldKey] ?? '';
-    router.push({
-      pathname: '/edit-profile',
-      params: {
-        field: fieldKey,
-        value: currentValue,
-      },
-    });
   };
 
   const handleLogout = () => {
@@ -168,7 +154,6 @@ const ProfilePage = () => {
     { key: 'email', value: profile.email },
     { key: 'phone', value: profile.phone },
     { key: 'role', value: profile.role },
-    { key: 'password', value: profile.hasPassword ? '••••••••' : 'Not set' },
   ]), [profile]);
 
   const renderDeliveredOrderCard = (order, index) => (
@@ -202,9 +187,6 @@ const ProfilePage = () => {
           <Text style={styles.label}>{renderFieldLabel(field.key)}:</Text>
           <View style={styles.fieldValue}>
             <Text style={styles.fieldText}>{field.value ?? '—'}</Text>
-            <TouchableOpacity style={styles.editButton} onPress={() => handleEditField(field.key)}>
-              <Icon name="pencil" size={18} color="#4B2C20" />
-            </TouchableOpacity>
           </View>
         </View>
       ))}

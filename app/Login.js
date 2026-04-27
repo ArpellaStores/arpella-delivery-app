@@ -18,7 +18,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import logo from '../assets/images/logo.jpeg';
-import { loginUser } from '../redux/slices/authSlice';
+import { setCredentials } from '../redux/slices/authSlice';
+import { useLoginMutation } from '../redux/api/authApi';
+import ForgotPasswordModal from '../components/ForgotPasswordModal';
 
 const CREDENTIALS_KEY = 'arpella_credentials_v1';
 
@@ -31,6 +33,8 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
   const [manualLoginPressed, setManualLoginPressed] = useState(false);
+  const [forgotPasswordVisible, setForgotPasswordVisible] = useState(false);
+  const [loginApi, { isLoading: isLoginLoading }] = useLoginMutation();
 
   // Redux state with safe fallbacks
   const authState = useSelector((state) => state.auth) || {};
@@ -43,11 +47,13 @@ export default function Login() {
     },
   });
 
-  // Allowed roles logic
-  const isAllowedRole = useCallback((role) => {
-    if (!role) return false;
+  const isAllowedRole = useCallback((roleOrRoles) => {
+    if (!roleOrRoles) return false;
     const allowedRoles = ['Admin', 'admin', 'Delivery', 'delivery', 'delivery guy'];
-    return allowedRoles.some(allowedRole => allowedRole.toLowerCase() === role.toLowerCase());
+    if (Array.isArray(roleOrRoles)) {
+      return roleOrRoles.some(role => allowedRoles.some(allowedRole => allowedRole.toLowerCase() === role.toLowerCase()));
+    }
+    return allowedRoles.some(allowedRole => allowedRole.toLowerCase() === roleOrRoles.toLowerCase());
   }, []);
 
   // --- SecureStore helpers ---
@@ -205,36 +211,44 @@ export default function Login() {
           password: creds.pass,
         };
 
-        const result = await dispatch(loginUser(loginData));
-        if (loginUser.fulfilled.match(result)) {
-          const userData = result.payload;
-          if (userData && userData.role && isAllowedRole(userData.role)) {
-            toast.show(`Welcome back, ${userData.firstName || 'User'}!`, {
-              type: 'success',
-              duration: 3500,
-              placement: 'top',
-              offsetTop: 50,
-            });
-            router.replace('./Home');
-          } else {
-            toast.show('Access denied. Only Admin and Delivery personnel are allowed.', {
-              type: 'danger',
-              duration: 4000,
-              placement: 'top',
-              offsetTop: 50,
-            });
-            await clearCredentials();
-            setRememberMe(false);
-          }
+        const result = await loginApi(loginData).unwrap();
+        const userData = Array.isArray(result) ? result[0] : result;
+        const userObj = userData.user || userData;
+        const roles = userObj.roles || userObj.role;
+        
+        if (userObj && roles && isAllowedRole(roles)) {
+          const structuredData = {
+            token: userData.token || userData.Token || '',
+            user: {
+              ...userObj,
+              phone: normalized,
+              roles: Array.isArray(roles) ? roles : [roles],
+              role: Array.isArray(roles) ? roles[0] : roles,
+            }
+          };
+          dispatch(setCredentials(structuredData));
+          toast.show(`Welcome back, ${userObj.firstName || 'User'}!`, {
+            type: 'success',
+            duration: 3500,
+            placement: 'top',
+            offsetTop: 50,
+          });
+          router.replace('/Home');
         } else {
-          const errorMessage = getErrorMessage(result.payload || result.error);
-          toast.show(errorMessage, { type: 'danger', placement: 'top', offsetTop: 50 });
+          toast.show('Access denied. Only Admin and Delivery personnel are allowed.', {
+            type: 'danger',
+            duration: 4000,
+            placement: 'top',
+            offsetTop: 50,
+          });
           await clearCredentials();
           setRememberMe(false);
         }
       } catch (e) {
         console.error('Auto-login error:', e);
-        toast.show('Auto-login encountered an issue. Please login manually.', { type: 'warning', duration: 2000 });
+        // Do not toast for auto-login failure to avoid annoyance, just clear.
+        await clearCredentials();
+        setRememberMe(false);
       } finally {
         setIsSubmitting(false);
       }
@@ -279,7 +293,7 @@ export default function Login() {
     setShowPassword((prev) => !prev);
   };
 
-  const isButtonDisabled = isSubmitting || isLoading;
+  const isButtonDisabled = isSubmitting || isLoginLoading || isLoading;
 
   // Manual submit handler (user pressed Login)
   const onSubmit = async (data) => {
@@ -295,55 +309,47 @@ export default function Login() {
         password: data.password,
       };
 
-      console.log('Dispatching login with data:', { phone: normalizedPhone });
+      const result = await loginApi(loginData).unwrap();
+      const userData = Array.isArray(result) ? result[0] : result;
+      const userObj = userData.user || userData;
+      const roles = userObj.roles || userObj.role;
 
-      const result = await dispatch(loginUser(loginData));
-      console.log('Login result:', result);
-
-      if (loginUser.fulfilled.match(result)) {
-        // Success
-        const userData = result.payload;
-        console.log('User data:', userData);
-
-        if (userData && userData.role && isAllowedRole(userData.role)) {
-          toast.show(`Welcome back, ${userData.firstName || 'User'}!`, {
-            type: 'success',
-            duration: 3500,
-            placement: 'top',
-            offsetTop: 50,
-          });
-
-          if (rememberMe) {
-            await saveCredentials({ phone: normalizedPhone, pass: data.password, remember: true });
-          } else {
-            await clearCredentials();
+      if (userObj && roles && isAllowedRole(roles)) {
+        const structuredData = {
+          token: userData.token || userData.Token || '',
+          user: {
+            ...userObj,
+            phone: normalizedPhone,
+            roles: Array.isArray(roles) ? roles : [roles],
+            role: Array.isArray(roles) ? roles[0] : roles,
           }
-
-          router.replace('./Home');
-        } else {
-          toast.show('Access denied. Only Admin and Delivery personnel are allowed.', {
-            type: 'danger',
-            duration: 4000,
-            placement: 'top',
-            offsetTop: 50,
-          });
-          // make sure credentials aren't stored for disallowed user
-          await clearCredentials();
-          setRememberMe(false);
-        }
-      } else {
-        // Rejected
-        console.log('Login was rejected:', result.payload || result.error);
-        const errorMessage = getErrorMessage(result.payload || result.error);
-        toast.show(errorMessage, {
-          type: 'danger',
-          duration: 3000,
+        };
+        dispatch(setCredentials(structuredData));
+        toast.show(`Welcome back, ${userObj.firstName || 'User'}!`, {
+          type: 'success',
+          duration: 3500,
           placement: 'top',
           offsetTop: 50,
         });
+
+        if (rememberMe) {
+          await saveCredentials({ phone: normalizedPhone, pass: data.password, remember: true });
+        } else {
+          await clearCredentials();
+        }
+
+        router.replace('/Home');
+      } else {
+        toast.show('Access denied. Only Admin and Delivery personnel are allowed.', {
+          type: 'danger',
+          duration: 4000,
+          placement: 'top',
+          offsetTop: 50,
+        });
+        await clearCredentials();
+        setRememberMe(false);
       }
     } catch (err) {
-      console.log('Catch block error:', err);
       const errorMessage = getErrorMessage(err);
       toast.show(errorMessage, { type: 'danger', duration: 3000, placement: 'top', offsetTop: 50 });
     } finally {
@@ -382,18 +388,30 @@ export default function Login() {
                 },
               }}
               render={({ field: { onChange, onBlur, value } }) => (
-                <View style={styles.inputContainer}>
-                  <Ionicons name="call-outline" size={20} color="#8B7355" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="254XXXXXXXXX"
-                    keyboardType="numeric"
-                    onBlur={onBlur}
-                    onChangeText={(txt) => onChange(normalizePhone(txt))}
-                    value={value}
-                    placeholderTextColor="#A0A0A0"
-                    editable={!isButtonDisabled}
-                  />
+                <View style={styles.phoneInputWrapper}>
+                  <View style={styles.phonePrefixContainer}>
+                    <Text style={styles.phonePrefixText}>+254</Text>
+                  </View>
+                  <View style={styles.phoneInputInner}>
+                    <Ionicons name="call-outline" size={20} color="#8B7355" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="7XXXXXXXX"
+                      keyboardType="numeric"
+                      onBlur={onBlur}
+                      onChangeText={(txt) => {
+                        let cleaned = txt.replace(/\D/g, '');
+                        if (cleaned.startsWith('0')) {
+                          cleaned = cleaned.substring(1);
+                        }
+                        onChange(`254${cleaned}`);
+                      }}
+                      value={value ? value.replace(/^254/, '') : ''}
+                      placeholderTextColor="#A0A0A0"
+                      editable={!isButtonDisabled}
+                      maxLength={9}
+                    />
+                  </View>
                 </View>
               )}
             />
@@ -450,6 +468,10 @@ export default function Login() {
             )}
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.forgotPasswordButton} onPress={() => setForgotPasswordVisible(true)}>
+            <Text style={styles.forgotPasswordText}>Forgot / Reset Password?</Text>
+          </TouchableOpacity>
+
           <View style={styles.roleInfoContainer}>
             <Ionicons name="information-circle-outline" size={16} color="#8B7355" />
             <Text style={styles.roleInfoText}>Only Admin and Delivery personnel can access this app</Text>
@@ -464,6 +486,11 @@ export default function Login() {
             </View>
           </View>
         )}
+
+        <ForgotPasswordModal
+          visible={forgotPasswordVisible}
+          onClose={() => setForgotPasswordVisible(false)}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -565,6 +592,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 48,
   },
+  phoneInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    backgroundColor: '#FAFAFA',
+    height: 48,
+    overflow: 'hidden',
+  },
+  phonePrefixContainer: {
+    backgroundColor: '#EAEAEA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    height: '100%',
+    borderRightWidth: 1,
+    borderRightColor: '#D0D0D0',
+  },
+  phonePrefixText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4B2C20',
+  },
+  phoneInputInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: '100%',
+  },
   inputIcon: {
     marginRight: 10,
   },
@@ -633,6 +691,16 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginLeft: 8,
+  },
+  forgotPasswordButton: {
+    marginTop: 15,
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  forgotPasswordText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4B2C20',
   },
   roleInfoContainer: {
     flexDirection: 'row',

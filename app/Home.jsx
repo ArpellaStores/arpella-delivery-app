@@ -29,10 +29,11 @@ export default function DashboardScreen() {
   const user = auth?.user ?? null;
 
   // Extract phone and name robustly from different user shapes
-  const userPhone = (typeof user === 'object' && (user.phoneNumber || user.userName || user.phone)) || null;
+  const actualUser = user?.user || user;
+  const userPhone = (typeof actualUser === 'object' && (actualUser.phoneNumber || actualUser.userName || actualUser.phone)) || null;
   const userName =
-    (typeof user === 'object' &&
-      (user.firstName || user.userName || `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim())) ||
+    (typeof actualUser === 'object' &&
+      (actualUser.firstName || actualUser.userName || `${actualUser.firstName ?? ''} ${actualUser.lastName ?? ''}`.trim())) ||
     'Unknown';
 
   useEffect(() => {
@@ -51,10 +52,8 @@ export default function DashboardScreen() {
           validateStatus: (status) => true, // handle statuses explicitly
         });
 
-        // Treat 404 as "no deliveries" silently
         if (resp.status === 404) {
           setDeliveries([]);
-          console.info('Dashboard: no deliveries (404)');
           return;
         }
 
@@ -89,12 +88,10 @@ export default function DashboardScreen() {
         }));
 
         setDeliveries(processedData);
-        console.log('Dashboard: deliveries loaded', processedData.length);
       } catch (error) {
         // If server returned 404 in catch, treat as empty (silent)
         if (error?.response?.status === 404) {
           setDeliveries([]);
-          console.info('Dashboard: no deliveries (404 in catch)');
         } else {
           console.error('Failed to fetch deliveries:', error);
           if (error.code === 'ECONNABORTED') {
