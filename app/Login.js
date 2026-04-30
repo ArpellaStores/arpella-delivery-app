@@ -66,13 +66,13 @@ export default function Login() {
         savedAt: Date.now(),
       };
       await SecureStore.setItemAsync(CREDENTIALS_KEY, JSON.stringify(payload));
-      console.info('[Login] SecureStore: credentials saved ->', {
+      /* console.info('[Login] SecureStore: credentials saved ->', {
         phone: payload.phone ? `${payload.phone.slice(0, 6)}****` : null,
         remember: payload.remember,
-      });
+      }); */
       return true;
     } catch (e) {
-      console.error('[Login] SecureStore save failed:', e);
+
       return false;
     }
   };
@@ -81,18 +81,18 @@ export default function Login() {
     try {
       const txt = await SecureStore.getItemAsync(CREDENTIALS_KEY);
       if (!txt) {
-        console.info('[Login] SecureStore: no saved credentials');
+
         return null;
       }
       const parsed = JSON.parse(txt);
-      console.info('[Login] SecureStore: loaded credentials ->', {
+      /* console.info('[Login] SecureStore: loaded credentials ->', {
         phone: parsed.phone ? `${parsed.phone.slice(0, 6)}****` : null,
         remember: parsed.remember,
         savedAt: parsed.savedAt,
-      });
+      }); */
       return parsed;
     } catch (e) {
-      console.error('[Login] SecureStore load failed:', e);
+
       return null;
     }
   };
@@ -100,10 +100,10 @@ export default function Login() {
   const clearCredentials = async () => {
     try {
       await SecureStore.deleteItemAsync(CREDENTIALS_KEY);
-      console.info('[Login] SecureStore: credentials cleared');
+
       return true;
     } catch (e) {
-      console.error('[Login] SecureStore clear failed:', e);
+
       return false;
     }
   };
@@ -170,7 +170,7 @@ export default function Login() {
           setValue('password', creds.pass);
         }
       } catch (e) {
-        console.error('Error loading credentials on mount:', e);
+
       }
     })();
 
@@ -187,7 +187,7 @@ export default function Login() {
     const performAutoLogin = async () => {
       if (!mounted) return;
       if (autoLoginAttempted || isAuthenticated || manualLoginPressed) {
-        console.info('[Login] Auto-login skipped (already attempted or user authenticated or manual login in progress)');
+
         return;
       }
 
@@ -196,7 +196,7 @@ export default function Login() {
       try {
         const creds = await loadCredentials();
         if (!creds || !creds.remember || !creds.phone || !creds.pass) {
-          console.info('[Login] No usable saved credentials (remember flag, phone or pass missing)');
+
           return;
         }
 
@@ -245,7 +245,7 @@ export default function Login() {
           setRememberMe(false);
         }
       } catch (e) {
-        console.error('Auto-login error:', e);
+
         // Do not toast for auto-login failure to avoid annoyance, just clear.
         await clearCredentials();
         setRememberMe(false);

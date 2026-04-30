@@ -36,12 +36,12 @@ const baseQueryWithLogout = async (args, queryApi, extraOptions) => {
     url?.includes('register') ||
     url?.includes('reset-password');
 
-  console.log(
+  /* console.log(
     `[API] ${method} ${url} | token: ${token ? token.slice(0, 20) + '…' : 'NONE'} | public: ${isPublicAuthEndpoint}`
-  );
+  ); */
 
   if (!token && !isPublicAuthEndpoint) {
-    console.warn('[API] No token — dispatching logout and redirecting to Login');
+
     queryApi.dispatch(logout());
     if (router?.replace) router.replace('/Login');
     return {
@@ -56,15 +56,15 @@ const baseQueryWithLogout = async (args, queryApi, extraOptions) => {
   const result = await baseQuery(args, queryApi, extraOptions);
 
   if (result.error) {
-    console.error(
+    /* console.error(
       `[API ERROR] ${method} ${url}\nStatus: ${result.error.status}\nData: ${JSON.stringify(result.error.data ?? result.error.error, null, 2)}`
-    );
+    ); */
   } else {
-    console.log(`[API OK] ${method} ${url} → status ${result.meta?.response?.status ?? 'ok'}`);
+
   }
 
   if (result?.error?.status === 401 && !url?.includes('login')) {
-    console.warn('[API] 401 received — dispatching logout');
+
     queryApi.dispatch(logout());
     if (router?.replace) router.replace('/Login');
   }

@@ -62,7 +62,7 @@ const ProfilePage = () => {
   useEffect(() => {
     const fetchDeliveredOrders = async () => {
       if (!user || !userPhone) {
-        console.warn('ProfilePage: user or phone not found for fetching delivered orders');
+
         return;
       }
 
@@ -92,7 +92,7 @@ const ProfilePage = () => {
 
         setDeliveredOrders(processedData);
       } catch (error) {
-        console.error('Failed to fetch delivered orders:', error);
+
         // Don't show alert for this non-critical error, just log it
       } finally {
         setLoadingOrders(false);

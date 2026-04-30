@@ -40,14 +40,14 @@ export default function DashboardScreen() {
   useEffect(() => {
     const fetchDeliveries = async () => {
       if (!userPhone) {
-        console.warn('DashboardScreen: user phone not found. Auth state:', auth);
+
         Alert.alert('Error', 'User phone number not found. Please login again.');
         return;
       }
 
       setLoading(true);
       const url = `${BASE_URL}/delivery-orders/${userPhone}`;
-      console.log(`[Home.jsx] Fetching deliveries...\nURL: ${url}\nToken: ${token ? token.substring(0, 20) + '...' : 'NONE'}`);
+      // console.log(`[Home.jsx] Fetching deliveries...\nURL: ${url}\nToken: ${token ? token.substring(0, 20) + '...' : 'NONE'}`);
       
       try {
         const resp = await axios.get(url, {
@@ -100,7 +100,7 @@ export default function DashboardScreen() {
         if (error?.response?.status === 404) {
           setDeliveries([]);
         } else {
-          console.error('Failed to fetch deliveries:', error);
+
           if (error.code === 'ECONNABORTED') {
             Alert.alert('Error', 'Request timed out. Check your internet connection.');
           } else if (error.response) {
@@ -172,7 +172,7 @@ export default function DashboardScreen() {
         },
       });
     } catch (error) {
-      console.error('Failed to start delivery:', error);
+
       if (error.code === 'ECONNABORTED') {
         Alert.alert('Error', 'Request timed out. Please try again.');
       } else if (error.response) {
@@ -230,7 +230,7 @@ export default function DashboardScreen() {
         },
       });
     } catch (error) {
-      console.error('Failed to continue delivery:', error);
+
       Alert.alert('Error', 'Failed to fetch order details.');
     } finally {
       setLoadingOrderId(null);

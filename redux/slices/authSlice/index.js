@@ -8,7 +8,7 @@ export const loginUser = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await loginUserApi(credentials);
-      console.log('API Response:', response); // Debug log
+
 
       // Handle different response structures
       const userData = response.data || response;
@@ -20,7 +20,7 @@ export const loginUser = createAsyncThunk(
 
       return userData;
     } catch (error) {
-      console.error('Login API Error:', error); // Debug log
+
 
       let errorMessage = 'Login failed. Please check your credentials.';
 

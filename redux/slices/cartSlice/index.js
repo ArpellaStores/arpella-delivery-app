@@ -12,7 +12,7 @@ const cartSlice = createSlice({
       const { id } = product;
     
       if (!id) {
-        console.error("Product ID is undefined");
+
         return; // Prevent invalid updates
       }
     
@@ -24,7 +24,7 @@ const cartSlice = createSlice({
         state.items[id] = product;
       }
     
-      console.log("Updated Cart:", state.items); // Log the updated cart state
+
     },
 
     // Optional: Remove item from the cart

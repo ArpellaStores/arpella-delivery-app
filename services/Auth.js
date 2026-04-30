@@ -22,7 +22,7 @@ export const loginUserApi = async ({ phoneNumber, password }) => {
     // Some APIs return arrays, normalize
     return Array.isArray(response.data) ? response.data[0] : response.data;
   } catch (error) {
-    console.error('[loginUserApi] error:', error?.response?.data || error.message);
+
     throw error;
   }
 };

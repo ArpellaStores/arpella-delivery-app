@@ -45,22 +45,22 @@ const MapScreen = () => {
     null;
 
   useEffect(() => {
-    console.log('MapScreen params:', params);
+
     
     // read params passed from DashboardScreen
     if (params?.destination) {
       try {
         const dest = JSON.parse(params.destination);
-        console.log('Parsed destination:', dest);
+
         if (dest?.latitude && dest?.longitude && 
             typeof dest.latitude === 'number' && 
             typeof dest.longitude === 'number') {
           setDestination(dest);
         } else {
-          console.warn('Invalid destination coordinates');
+
         }
       } catch (e) {
-        console.error('Error parsing destination param:', e);
+
         Alert.alert('Error', 'Invalid destination data received.');
       }
     }
@@ -68,10 +68,10 @@ const MapScreen = () => {
     if (params?.order) {
       try {
         const ord = JSON.parse(params.order);
-        console.log('Parsed order:', ord);
+
         setOrder(ord);
       } catch (e) {
-        console.error('Error parsing order param:', e);
+
         Alert.alert('Error', 'Invalid order data received.');
       }
     }
@@ -79,10 +79,10 @@ const MapScreen = () => {
     if (params?.driver) {
       try {
         const driverData = JSON.parse(params.driver);
-        console.log('Parsed driver:', driverData);
+
         setDriver(driverData);
       } catch (e) {
-        console.error('Error parsing driver param:', e);
+
       }
     }
   }, [params?.destination, params?.order, params?.driver]);
@@ -98,7 +98,7 @@ const MapScreen = () => {
           
           if (location?.coords?.latitude && location?.coords?.longitude) {
             setCurrentLocation(location.coords);
-            console.log('Current location set:', location.coords);
+
           } else {
             setErrorMsg('Unable to get valid location coordinates');
           }
@@ -107,7 +107,7 @@ const MapScreen = () => {
           Alert.alert('Permission Required', 'Please enable location permissions to use this feature.');
         }
       } catch (error) {
-        console.error('Error getting location:', error);
+
         setErrorMsg('Error getting location');
         Alert.alert('Error', 'Failed to get your current location.');
       }
@@ -117,12 +117,12 @@ const MapScreen = () => {
 
   const fetchRoute = useCallback(async () => {
     if (!currentLocation || routeLoading) {
-      console.log('No current location available for route calculation or already loading');
+
       return;
     }
     
     if (!GOOGLE_MAPS_API_KEY) {
-      console.warn('Google Maps API key missing.');
+
       Alert.alert('Configuration Error', 'Google Maps API key is missing.');
       return;
     }
@@ -131,7 +131,7 @@ const MapScreen = () => {
     const origin = `${currentLocation.latitude},${currentLocation.longitude}`;
     const dest = `${destination.latitude},${destination.longitude}`;
 
-    console.log('Fetching route from:', origin, 'to:', dest);
+
 
     try {
       const response = await axios.get(
@@ -139,7 +139,7 @@ const MapScreen = () => {
         { timeout: 10000 }
       );
 
-      console.log('Google Maps API response status:', response.data.status);
+
 
       if (response.data.status === 'OK' && response.data.routes?.length > 0) {
         const routeData = response.data.routes[0];
@@ -159,17 +159,17 @@ const MapScreen = () => {
           setDistance(leg.distance?.text || 'Unknown');
           setDuration(leg.duration?.text || 'Unknown');
           
-          console.log('Route data set successfully');
+
         } else {
-          console.warn('No legs found in route');
+
           Alert.alert('Route Error', 'Unable to calculate route legs.');
         }
       } else {
-        console.warn('No route found or API error:', response.data.status, response.data.error_message);
+
         Alert.alert('Route Error', response.data.error_message || 'No route found between locations.');
       }
     } catch (error) {
-      console.error('Error fetching route:', error);
+
       if (error.code === 'ECONNABORTED') {
         Alert.alert('Timeout', 'Route calculation timed out. Please try again.');
       } else if (error.response) {
@@ -199,7 +199,7 @@ const MapScreen = () => {
       const meters = distance.toLowerCase().includes('km') ? numeric * 1000 : numeric;
       return meters < 50;
     } catch (error) {
-      console.error('Error parsing distance:', error);
+
       return false;
     }
   }, [distance]);

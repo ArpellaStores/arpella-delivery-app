@@ -35,9 +35,7 @@ function AppContent() {
   const reduxLoading = useSelector(s => s.auth.loading)
 
   useEffect(() => {
-    ScreenOrientation.unlockAsync().catch(err =>
-      console.warn('Failed to unlock screen orientation:', err)
-    )
+    ScreenOrientation.unlockAsync().catch(() => {})
   }, [])
 
   useEffect(() => {
