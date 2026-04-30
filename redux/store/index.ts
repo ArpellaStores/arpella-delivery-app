@@ -1,18 +1,34 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, combineReducers } from '@reduxjs/toolkit';
+import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import authReducer from '../slices/authSlice';
-import cartReducer from '../slices/cartSlice'
-import {thunk} from 'redux-thunk';
+import cartReducer from '../slices/cartSlice';
+import { thunk } from 'redux-thunk';
 import { api } from '../api';
 
-const store = configureStore({
-  reducer: {
-    auth: authReducer,
-    cart: cartReducer,
-    [api.reducerPath]: api.reducer,
-  },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(thunk, api.middleware), 
+const authPersistConfig = {
+  key: 'auth',
+  storage: AsyncStorage,
+  whitelist: ['isAuthenticated', 'user'],
+};
+
+const rootReducer = combineReducers({
+  auth: persistReducer(authPersistConfig, authReducer),
+  cart: cartReducer,
+  [api.reducerPath]: api.reducer,
 });
+
+const store = configureStore({
+  reducer: rootReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+      },
+    }).concat(thunk, api.middleware),
+});
+
+export const persistor = persistStore(store);
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 

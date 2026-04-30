@@ -1,2 +1,1 @@
-
-export const baseUrl = "https:api.arpellastore.com"
+export const baseUrl = "https://api.arpellastore.com";

@@ -30,11 +30,12 @@ export default function DashboardScreen() {
 
   // Extract phone and name robustly from different user shapes
   const actualUser = user?.user || user;
-  const userPhone = (typeof actualUser === 'object' && (actualUser.phoneNumber || actualUser.userName || actualUser.phone)) || null;
+  const userPhone = (actualUser && typeof actualUser === 'object' && (actualUser.phoneNumber || actualUser.userName || actualUser.phone)) || null;
   const userName =
-    (typeof actualUser === 'object' &&
+    (actualUser && typeof actualUser === 'object' &&
       (actualUser.firstName || actualUser.userName || `${actualUser.firstName ?? ''} ${actualUser.lastName ?? ''}`.trim())) ||
     'Unknown';
+  const token = user?.token || user?.Token || auth?.token;
 
   useEffect(() => {
     const fetchDeliveries = async () => {
@@ -45,10 +46,16 @@ export default function DashboardScreen() {
       }
 
       setLoading(true);
+      const url = `${BASE_URL}/delivery-orders/${userPhone}`;
+      console.log(`[Home.jsx] Fetching deliveries...\nURL: ${url}\nToken: ${token ? token.substring(0, 20) + '...' : 'NONE'}`);
+      
       try {
-        const resp = await axios.get(`${BASE_URL}/delivery-orders/${userPhone}`, {
+        const resp = await axios.get(url, {
           timeout: 10000,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            ...(token ? { 'authorization': `Bearer ${token}` } : {})
+          },
           validateStatus: (status) => true, // handle statuses explicitly
         });
 
@@ -125,13 +132,19 @@ export default function DashboardScreen() {
       if (item.status !== 'Delivering') {
         await axios.put(`${BASE_URL}/deliverytracking/${item.orderId}/status?status=Delivering`, null, {
           timeout: 10000,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            ...(token ? { 'authorization': `Bearer ${token}` } : {})
+          },
         });
       }
 
       const resp = await axios.get(`${BASE_URL}/order/${item.orderId}`, {
         timeout: 10000,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'authorization': `Bearer ${token}` } : {})
+        },
       });
 
       const order = resp.data;
@@ -186,7 +199,10 @@ export default function DashboardScreen() {
     try {
       const resp = await axios.get(`${BASE_URL}/order/${item.orderId}`, {
         timeout: 10000,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'authorization': `Bearer ${token}` } : {})
+        },
       });
 
       const order = resp.data;
