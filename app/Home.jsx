@@ -89,10 +89,14 @@ export default function DashboardScreen() {
         const filteredData = data.filter((item) => item?.status !== 'Delivered');
 
         // Ensure stable unique ids for rendering
-        const processedData = filteredData.map((item, index) => ({
-          ...item,
-          uniqueId: item?.orderId ? `${item.orderId}` : item?._id ? `${item._id}` : `unknown_${index}`,
-        }));
+        const processedData = filteredData.map((item, index) => {
+          const id = item?.orderId || item?.orderid;
+          return {
+            ...item,
+            orderId: id,
+            uniqueId: id ? `${id}` : item?._id ? `${item._id}` : `unknown_${index}`,
+          };
+        });
 
         setDeliveries(processedData);
       } catch (error) {
@@ -121,27 +125,28 @@ export default function DashboardScreen() {
   }, [userPhone]);
 
   const handleStartDelivery = async (item) => {
-    if (!item?.orderId) {
+    const orderId = item?.orderId || item?.orderid;
+    if (!orderId) {
       Alert.alert('Error', 'Order ID missing.');
       return;
     }
 
     setLoading(true);
-    setLoadingOrderId(item.orderId);
+    setLoadingOrderId(orderId);
     try {
       if (item.status !== 'Delivering') {
-        await axios.put(`${BASE_URL}/deliverytracking/${item.orderId}/status?status=Delivering`, null, {
+        await axios.put(`${BASE_URL}/deliverytracking/${orderId}/status?status=Delivering`, null, {
           timeout: 10000,
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             ...(token ? { 'authorization': `Bearer ${token}` } : {})
           },
         });
       }
 
-      const resp = await axios.get(`${BASE_URL}/order/${item.orderId}`, {
+      const resp = await axios.get(`${BASE_URL}/order/${orderId}`, {
         timeout: 10000,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'authorization': `Bearer ${token}` } : {})
         },
@@ -172,7 +177,6 @@ export default function DashboardScreen() {
         },
       });
     } catch (error) {
-
       if (error.code === 'ECONNABORTED') {
         Alert.alert('Error', 'Request timed out. Please try again.');
       } else if (error.response) {
@@ -190,16 +194,17 @@ export default function DashboardScreen() {
   };
 
   const handleContinueDelivery = async (item) => {
-    if (!item?.orderId) {
+    const orderId = item?.orderId || item?.orderid;
+    if (!orderId) {
       Alert.alert('Error', 'Order ID missing.');
       return;
     }
 
-    setLoadingOrderId(item.orderId);
+    setLoadingOrderId(orderId);
     try {
-      const resp = await axios.get(`${BASE_URL}/order/${item.orderId}`, {
+      const resp = await axios.get(`${BASE_URL}/order/${orderId}`, {
         timeout: 10000,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'authorization': `Bearer ${token}` } : {})
         },
@@ -230,14 +235,21 @@ export default function DashboardScreen() {
         },
       });
     } catch (error) {
-
-      Alert.alert('Error', 'Failed to fetch order details.');
+      if (error.code === 'ECONNABORTED') {
+        Alert.alert('Error', 'Request timed out. Please try again.');
+      } else if (error.response) {
+        const message = error.response.data?.message || `Error: ${error.response.status}`;
+        Alert.alert('Error', message);
+      } else {
+        Alert.alert('Error', 'Failed to fetch order details.');
+      }
     } finally {
       setLoadingOrderId(null);
     }
   };
 
   const renderDeliveryItem = ({ item }) => {
+    const itemOrderId = item?.orderId || item?.orderid;
     const assignedToUser =
       (item.deliveryAgent && String(item.deliveryAgent) === String(userPhone)) ||
       (item.assignedTo && String(item.assignedTo) === String(userPhone)) ||
@@ -247,17 +259,17 @@ export default function DashboardScreen() {
 
     return (
       <View style={styles.deliveryCard}>
-        <Text style={styles.orderId}>Order ID: {item.orderId ?? 'N/A'}</Text>
+        <Text style={styles.orderId}>Order ID: {itemOrderId ?? 'N/A'}</Text>
         <Text style={styles.customerInfo}>Customer: {item.username ?? item.userName ?? 'Unknown'}</Text>
         {item.deliveryAgent && <Text style={styles.agentInfo}>Agent: {item.deliveryAgent}</Text>}
 
         {isDelivering && assignedToUser ? (
           <TouchableOpacity
-            style={[styles.continueButton, loadingOrderId === item.orderId && styles.buttonDisabled]}
+            style={[styles.continueButton, loadingOrderId === itemOrderId && styles.buttonDisabled]}
             onPress={() => handleContinueDelivery(item)}
-            disabled={loadingOrderId === item.orderId}
+            disabled={loadingOrderId === itemOrderId}
           >
-            {loadingOrderId === item.orderId ? (
+            {loadingOrderId === itemOrderId ? (
               <View style={styles.loadingRow}>
                 <ActivityIndicator color="white" size="small" />
                 <Text style={[styles.buttonText, { marginLeft: 8 }]}>Loading...</Text>
@@ -268,11 +280,11 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.button, loadingOrderId === item.orderId && styles.buttonDisabled]}
+            style={[styles.button, loadingOrderId === itemOrderId && styles.buttonDisabled]}
             onPress={() => handleStartDelivery(item)}
-            disabled={loadingOrderId === item.orderId}
+            disabled={loadingOrderId === itemOrderId}
           >
-            {loadingOrderId === item.orderId ? (
+            {loadingOrderId === itemOrderId ? (
               <View style={styles.loadingRow}>
                 <ActivityIndicator color="white" size="small" />
                 <Text style={[styles.buttonText, { marginLeft: 8 }]}>Loading...</Text>

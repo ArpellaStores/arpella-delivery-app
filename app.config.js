@@ -37,7 +37,7 @@ export default ({ config }) => ({
       ],
       config: {
         googleMaps: {
-          apiKey: process.env.GOOGLE_MAPS_API_KEY || "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc"
+          apiKey: process.env.GOOGLE_MAPS_API_KEY || "AIzaSyAqIDdF5SwwzVD1Yk3o_Y4UtMsHI3n2WqA"
         }
       }
     },
@@ -55,7 +55,7 @@ export default ({ config }) => ({
         NSLocationAlwaysUsageDescription: "We need your location to show your current position on the map"
       },
       config: {
-        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc"
+        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || "AIzaSyAqIDdF5SwwzVD1Yk3o_Y4UtMsHI3n2WqA"
       }
     },
 
@@ -84,7 +84,7 @@ export default ({ config }) => ({
     },
 
     extra: {
-      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc",
+      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || "AIzaSyAqIDdF5SwwzVD1Yk3o_Y4UtMsHI3n2WqA",
       "eas": {
         "projectId": "1fe756a7-db90-46c2-a28f-f06b44494a8d"
       },

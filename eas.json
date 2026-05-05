@@ -10,7 +10,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "GOOGLE_MAPS_API_KEY": "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc"
+        "GOOGLE_MAPS_API_KEY": "AIzaSyAqIDdF5SwwzVD1Yk3o_Y4UtMsHI3n2WqA"
       }
     },
     "preview": {
@@ -19,12 +19,12 @@
       },
       "distribution": "internal",
       "env": {
-        "GOOGLE_MAPS_API_KEY": "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc"
+        "GOOGLE_MAPS_API_KEY": "AIzaSyAqIDdF5SwwzVD1Yk3o_Y4UtMsHI3n2WqA"
       }
     },
     "production": {
       "env": {
-        "GOOGLE_MAPS_API_KEY": "AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc"
+        "GOOGLE_MAPS_API_KEY": "AIzaSyAqIDdF5SwwzVD1Yk3o_Y4UtMsHI3n2WqA"
       },
       "android": {
         "buildType": "app-bundle"

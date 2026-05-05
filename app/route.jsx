@@ -10,7 +10,7 @@ import { useSelector } from 'react-redux';
 import { baseUrl } from '../constants/const';
 import BottomNav from './components/BottomNav';
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyD-YPpUWHXNzvQjjXjqj7mvO2Idi72jREc';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyAqIDdF5SwwzVD1Yk3o_Y4UtMsHI3n2WqA';
 const BASE_URL = baseUrl;
 
 const MapScreen = () => {
@@ -207,9 +207,8 @@ const MapScreen = () => {
   const getCustomerPhone = useCallback(() => {
     if (!order) return null;
     return (
-      order.userId ||
-      order.phone ||
       order.phoneNumber ||
+      order.phone ||
       order.customerPhone ||
       order.msisdn ||
       order?.customer?.phone ||
@@ -255,9 +254,9 @@ const MapScreen = () => {
       // Verify OTP
       await axios.post(`https://api.arpellastore.com/verify-otp?username=${phoneParam}&otp=${otpParam}`);
       
-      // Update order status
-      if (order?.orderid) {
-        await axios.put(`https://api.arpellastore.com/deliverytracking/${order.orderid}/status?status=Delivered`);
+      const orderId = order?.orderid || order?.orderId;
+      if (orderId) {
+        await axios.put(`https://api.arpellastore.com/deliverytracking/${orderId}/status?status=Delivered`);
       }
       
       // Close modal and reset
